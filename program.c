@@ -48,6 +48,7 @@ void help() {
     printf("exit - exit shell\n");
     printf("help - show help\n");
     printf("ls - list directory contents\n");
+    printf("cd - change the working directory\n");
 }
 
 int ls(char** argv) {
