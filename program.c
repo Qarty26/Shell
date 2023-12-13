@@ -12,6 +12,7 @@
 char line[256];
 char commands[101][256];
 int commandCounter = 0;
+char* currentDirectory;
 
 void add_to_history(char* line) {
     strcpy(commands[commandCounter++], line);
@@ -64,6 +65,10 @@ int ls(char** argv) {
     }
 }
 
+int cd(char* argv) {
+    chdir(argv);
+}
+
 void execute(char* command) {
     char commandCopy[256];
     strcpy(commandCopy, command);
@@ -95,6 +100,8 @@ void execute(char* command) {
         help();
     } else if (strcmp(actual_command, "ls") == 0) {
         ls(argv);
+    } else if (strcmp(actual_command, "cd") == 0) {
+        cd(argv[1]);
     } else {
         printf("Invalid command\n");
     }
@@ -111,7 +118,10 @@ int main() {
     system("clear");
 
     while (1) {
-        printf("myshell> ");
+        currentDirectory = malloc(256 * sizeof(char));
+        getcwd(currentDirectory, 256);
+        printf("%s> ", currentDirectory);
+        free(currentDirectory);
         get_command();
         execute(line);
     }
