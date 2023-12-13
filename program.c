@@ -51,14 +51,13 @@ void help() {
     printf("cd - change the working directory\n");
 }
 
-int ls(char** argv) {
+int ls(char** command, int size) {
     pid_t pid = fork();
     if (pid < 0)
         return errno;
     if (pid == 0){
-        strcpy(argv[0], "/usr/bin/ls");
-
-        execve("/usr/bin/ls", argv, NULL);
+        command[size] = NULL;
+        execve("/usr/bin/ls", command, NULL);
         perror(NULL);
     }
     else {
@@ -67,52 +66,59 @@ int ls(char** argv) {
 }
 
 int cd(char* argv) {
-    chdir(argv);
+    if(chdir(argv)){
+        perror("Eroare");
+        return 1;
+    }
+}
+
+void echo(char** command, int size) {
+    for(int i = 1; i < size; ++i){
+        printf("%s ", command[i]);
+    }
+    printf("\n");
 }
 
 void execute(char* command) {
-    char commandCopy[256];
-    strcpy(commandCopy, command);
-
-    char *token = strtok(commandCopy, " ");
-    char* actual_command = token;
-    char** argv = malloc(101 * sizeof(char*));
-    argv[0] = malloc(256 * sizeof(char));
-    argv[1] = malloc(256 * sizeof(char));
-
-    token = strtok(NULL, " ");
-    int counter = 1;
-    while (token != NULL) {
-        if (counter != 1)
-            argv[counter] = malloc(256 * sizeof(char));
-        strcpy(argv[counter++], token);
-        token = strtok(NULL, " ");
+    int cnt = 0;
+    char** new_command = malloc(101 * sizeof(char*));
+    for(int i = 0; i < 101; ++i){
+        new_command[i] = malloc(256 * sizeof(char));
     }
+    char* copy_command = malloc(256 * sizeof(char));
+    strcpy(copy_command, command);
+    char* p = strtok(copy_command, " ");
+    while(p != NULL){
+        strcpy(new_command[cnt++], p);
+        p = strtok(NULL, " ");
+    }
+    char* actual_command = malloc(256 * sizeof(char));
+    strcpy(actual_command, new_command[0]);
 
-    argv[counter] = NULL;
-
-    if (strcmp(command, "history") == 0) {
+    if (strcmp(actual_command, "history") == 0 && cnt == 1) {
         history();
-    } else if (strcmp(command, "clear") == 0) {
+    } else if (strcmp(actual_command, "clear") == 0 && cnt == 1) {
         clear();
-    } else if (strcmp(command, "exit") == 0) {
+    } else if (strcmp(actual_command, "exit") == 0 && cnt == 1) {
         exit(0);
-    } else if (strcmp(command, "help") == 0) {
+    } else if (strcmp(actual_command, "help") == 0 && cnt == 1) {
         help();
     } else if (strcmp(actual_command, "ls") == 0) {
-        ls(argv);
+        ls(new_command, cnt);
     } else if (strcmp(actual_command, "cd") == 0) {
-        cd(argv[1]);
+        cd(new_command[1]);
+    } else if(strcmp(actual_command, "echo") == 0) {
+        echo(new_command, cnt);
     } else {
         printf("Invalid command\n");
     }
 
-    for (int i = 0; i < counter; i++) {
-        if (argv[i] != NULL)
-            free(argv[i]);
+    for (int i = 0; i < 101; i++) {
+        if (new_command[i] != NULL)
+            free(new_command[i]);
     }
-    if (argv != NULL)
-        free(argv);
+    if (new_command != NULL)
+        free(new_command);
 }
 
 int main() {
@@ -122,10 +128,9 @@ int main() {
         currentDirectory = malloc(256 * sizeof(char));
         getcwd(currentDirectory, 256);
         printf("%s> ", currentDirectory);
-        free(currentDirectory);
+        free(currentDirectory);   
         get_command();
         execute(line);
     }
-
     return 0;
 }
