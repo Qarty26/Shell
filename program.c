@@ -13,6 +13,8 @@ char line[256];
 char commands[101][256];
 int commandCounter = 0;
 char* currentDirectory;
+int running = 1; 
+
 
 void add_to_history(char* line) {
     strcpy(commands[commandCounter++], line);
@@ -49,6 +51,8 @@ void help() {
     printf("help - show help\n");
     printf("ls - list directory contents\n");
     printf("cd - change the working directory\n");
+    printf("echo - show given message\n");
+    printf("pwd - show current path\n");
 }
 
 int ls(char** command, int size) {
@@ -79,19 +83,34 @@ void echo(char** command, int size) {
     printf("\n");
 }
 
+void pwd()
+{
+    printf("%s\n", currentDirectory);
+}
+
+void exitt()
+{
+    running = 0;
+}
+
 void execute(char* command) {
+
     int cnt = 0;
+
     char** new_command = malloc(101 * sizeof(char*));
     for(int i = 0; i < 101; ++i){
         new_command[i] = malloc(256 * sizeof(char));
     }
+
     char* copy_command = malloc(256 * sizeof(char));
     strcpy(copy_command, command);
     char* p = strtok(copy_command, " ");
+
     while(p != NULL){
         strcpy(new_command[cnt++], p);
         p = strtok(NULL, " ");
     }
+
     char* actual_command = malloc(256 * sizeof(char));
     strcpy(actual_command, new_command[0]);
 
@@ -99,8 +118,8 @@ void execute(char* command) {
         history();
     } else if (strcmp(actual_command, "clear") == 0 && cnt == 1) {
         clear();
-    } else if (strcmp(actual_command, "exit") == 0 && cnt == 1) {
-        exit(0);
+    } else if (strcmp(actual_command, "exit") == 0) {
+        exitt();
     } else if (strcmp(actual_command, "help") == 0 && cnt == 1) {
         help();
     } else if (strcmp(actual_command, "ls") == 0) {
@@ -109,6 +128,8 @@ void execute(char* command) {
         cd(new_command[1]);
     } else if(strcmp(actual_command, "echo") == 0) {
         echo(new_command, cnt);
+    } else if(strcmp(actual_command, "pwd") == 0) {
+        pwd();
     } else {
         printf("Invalid command\n");
     }
@@ -123,14 +144,14 @@ void execute(char* command) {
 
 int main() {
     system("clear");
+    currentDirectory = malloc(256 * sizeof(char));
 
-    while (1) {
-        currentDirectory = malloc(256 * sizeof(char));
+    while (running) {
         getcwd(currentDirectory, 256);
-        printf("%s> ", currentDirectory);
-        free(currentDirectory);   
+        printf("%s> ", currentDirectory); 
         get_command();
         execute(line);
     }
+    free(currentDirectory);  
     return 0;
 }
