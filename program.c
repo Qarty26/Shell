@@ -48,6 +48,7 @@ void clear() {
 
 void help() {
     printf("history - show command history\n");
+    printf("historywa - scroll with arrows through history");
     printf("clear - clear screen\n");
     printf("exit - exit shell\n");
     printf("help - show help\n");
@@ -157,6 +158,9 @@ int history_with_arrows(void)
   int first, second;
   int contor = commandCounter;
   int inWhile = 1;
+  char tempCommand[256];
+  strcpy(tempCommand, "");
+
 
     while(inWhile ==1)
     {
@@ -178,7 +182,8 @@ int history_with_arrows(void)
                     for(int i = 0; i<100; i++)
                         printf(" ");
 
-                    //print the command                                                                               
+                    //print and save the command
+                    strcpy(tempCommand, commands[contor]);                                                                               
                     printf("\r%s",commands[contor]);
                     break;  
 
@@ -192,18 +197,41 @@ int history_with_arrows(void)
                     for(int i = 0; i<100; i++)
                         printf(" ");
                     
-                    //print the command
+                    //print and save the command
+                    strcpy(tempCommand, commands[contor]);
                     printf("\r%s",commands[contor]);
                     break;
                 }
             default: break;  
             }
-        } 
+        }
+        else if(first == 127)
+        {
+            if(strcmp(tempCommand,"") != 0)
+            {
+                printf("\r");
+                for(int i = 0; i<100; i++)
+                    printf(" ");
+                int len = strlen(tempCommand);
+                strcpy(tempCommand + len - 1, tempCommand + len);
+                printf("\r%s",tempCommand); 
+            }
+        }
+        else if(first == 10)
+        {
+            printf("\n");
+            execute(tempCommand);
+            inWhile = 0;
+            break;
+        }
         else 
         {
-            inWhile = 0;
-            printf("\n");
-            break;
+            char charString[2] = {first, '\0'};
+            strcat(tempCommand, charString);
+            printf("\r");
+            for(int i = 0; i<100; i++)
+                printf(" ");
+            printf("\r%s",tempCommand); 
         }
 
     }
