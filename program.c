@@ -19,7 +19,7 @@ void add_to_history(char* line) {
     strcpy(commands[commandCounter++], line);
 }
 
-void get_command () {
+int get_command () {
     if (fgets(line, sizeof(line), stdin) != NULL) {
 
         int len = strlen(line);
@@ -27,10 +27,13 @@ void get_command () {
             line[len - 1] = '\0';
         }
     }
-
-    if (strlen(line) > 1) {
+    
+    if (strlen(line) >= 1) {
         add_to_history(line);
+        return 1;
     }
+
+    return 0;
 }
 
 void history() {
@@ -272,8 +275,8 @@ int main() {
     while (running) {
         getcwd(currentDirectory, 256);
         printf("%s> ", currentDirectory);
-        get_command();
-        execute(line);
+        if(get_command())
+            execute(line);
     }
     free(currentDirectory);
     return 0;
