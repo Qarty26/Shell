@@ -127,6 +127,88 @@ void exitt() {
     running = 0;
 }
 
+static struct termios old, current;
+
+void initTermios() 
+{
+  tcgetattr(0, &old); 
+  current = old; 
+  current.c_lflag &= ~(ICANON | ECHO); 
+  tcsetattr(0, TCSANOW, &current); 
+}
+
+void resetTermios(void) 
+{
+  tcsetattr(0, TCSANOW, &old);
+}
+
+char getch(void) 
+{
+  char ch;
+  initTermios();
+  ch = getchar();
+  resetTermios();
+  return ch;
+}
+
+
+int history_with_arrows(void)
+{
+  int first, second;
+  int contor = commandCounter;
+  int inWhile = 1;
+
+    while(inWhile ==1)
+    {
+
+        first = getch();
+        if (first == '\x1b') 
+        {  
+            second = getch();  
+            switch (second) 
+            {
+            case '[':  
+                switch (getch()) {  
+                case 'A':
+                    if(contor > 0)
+                        contor--;
+
+                    //takes care of overwriting issue on the line
+                    printf("\r");
+                    for(int i = 0; i<100; i++)
+                        printf(" ");
+
+                    //print the command                                                                               
+                    printf("\r%s",commands[contor]);
+                    break;  
+
+
+                case 'B':
+                    if(contor < commandCounter - 1)
+                        contor++;
+
+                    //takes care of overwriting issue on the line
+                    printf("\r");
+                    for(int i = 0; i<100; i++)
+                        printf(" ");
+                    
+                    //print the command
+                    printf("\r%s",commands[contor]);
+                    break;
+                }
+            default: break;  
+            }
+        } 
+        else 
+        {
+            inWhile = 0;
+            printf("\n");
+            break;
+        }
+
+    }
+}
+
 void execute(char* command) {
     int cnt = 0;
     char** new_command = malloc(101 * sizeof(char*));
@@ -254,6 +336,8 @@ void execute(char* command) {
             pwd(pipe_fd);
         } else if(strcmp(actual_command, "grep") == 0) {
             grep(new_command[1]);
+        } else if(strcmp(actual_command, "historywa") == 0) {
+            history_with_arrows();
         } else {
             printf("Invalid command\n");
         }
@@ -267,6 +351,7 @@ void execute(char* command) {
     if (new_command != NULL)
         free(new_command);
 }
+
 
 int main() {
     system("clear");
