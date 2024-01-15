@@ -237,6 +237,65 @@ int history_with_arrows(void)
     }
 }
 
+int check_file(const char *path) {
+    if (access(path, F_OK) != -1) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+// if (!) test <conditie> (&& sau || (!) test <alta_conditie>) ; then <do_something>
+void ex_if(char** command, int size) {
+    int condition_met = 1; // Initially true for first condition
+    int i = 1; // Start from index 1 to skip the 'if' command itself
+
+    while (i < size) {
+        char* part = command[i];
+
+        if (strcmp(part, "test") == 0) {
+            // Implement your test conditions here
+            // Example: if test -f somefile
+            if (i + 2 < size && strcmp(command[i + 1], "-f") == 0) {
+                condition_met = check_file(command[i + 2]);
+                i += 3; // Skip to next part after test condition
+            }
+            // Extend with more conditions as needed
+        } else if (strcmp(part, "&&") == 0) {
+            if (!condition_met) {
+                break; // Exit if previous condition failed
+            }
+            i++;
+        } else if (strcmp(part, "||") == 0) {
+            if (condition_met) {
+                while(strcmp(command[i], "then")){
+                    i++;
+                }
+                i++;
+                break;
+            }
+            i++;
+        } else if(condition_met){
+            i++;
+            break;
+        } else{
+            break;
+        }
+    }
+    if (condition_met) {
+        // Execute the command if condition is met
+        char new_command[256] = "";
+        int new_command_size = 0;
+        for (int j = i; j < size; ++j) {
+            strcat(new_command, command[j]);
+            if(j != size - 1){
+                strcat(new_command, " ");
+            }
+        }
+        execute(new_command);
+    }
+}
+
 void execute(char* command) {
     int cnt = 0;
     char** new_command = malloc(101 * sizeof(char*));
@@ -268,6 +327,7 @@ void execute(char* command) {
         }
     }
 
+    int status;
     if (pipe_index != -1) {
         char* left_command[pipe_index + 1];
         char* right_command[cnt - pipe_index];
@@ -366,6 +426,8 @@ void execute(char* command) {
             grep(new_command[1]);
         } else if(strcmp(actual_command, "historywa") == 0) {
             history_with_arrows();
+        } else if(strcmp(actual_command, "if") == 0){
+            ex_if(new_command, cnt);
         } else {
             printf("Invalid command\n");
         }
