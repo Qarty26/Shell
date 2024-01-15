@@ -1,1 +1,0 @@
-if test -f /home/andrei/Desktop/file.txt echo Ceva

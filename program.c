@@ -69,6 +69,7 @@ int get_command() {
                     if (index >= 0) {
                         strcpy(tempCommand, commands[index--]);
                         cursorPosition = strlen(tempCommand);
+                        commandLength = cursorPosition;
                         printf("\33[2K\r"); // Clear the line
                         printf("%s> %s", currentDirectory, tempCommand);
                     }
@@ -77,6 +78,7 @@ int get_command() {
                     if (index < commandCounter - 1) {
                         strcpy(tempCommand, commands[++index]);
                         cursorPosition = strlen(tempCommand);
+                        commandLength = cursorPosition;
                         printf("\33[2K\r"); // Clear the line
                         printf("%s> %s", currentDirectory, tempCommand);
                     }
