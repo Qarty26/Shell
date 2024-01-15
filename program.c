@@ -6,30 +6,125 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #define BUFFER_SIZE 1024
 
 char line[256];
-char commands[101][256];
+char commands[1001][256];
 int commandCounter = 0;
 char* currentDirectory;
 int running = 1;
+struct termios old;
 
 void add_to_history(char* line) {
     strcpy(commands[commandCounter++], line);
 }
 
-int get_command () {
-    if (fgets(line, sizeof(line), stdin) != NULL) {
+void initTermios(int echo) {
+    struct termios newt;
+    tcgetattr(STDIN_FILENO, &old); // save old settings
+    newt = old; // new settings
+    newt.c_lflag &= ~ICANON; // disable buffered io
+    if (echo) {
+        newt.c_lflag |= ECHO; // set echo mode
+    } else {
+        newt.c_lflag &= ~ECHO; // set no echo mode
+    }
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt); // use these new terminal i/o settings now
+}
 
-        int len = strlen(line);
-        if (len > 0 && line[len - 1] == '\n') {
-            line[len - 1] = '\0';
+void resetTermios(void) {
+    tcsetattr(STDIN_FILENO, TCSANOW, &old);
+}
+
+char getch_(int echo) {
+    char ch;
+    initTermios(echo);
+    ch = getchar();
+    resetTermios();
+    return ch;
+}
+
+char getch(void) {
+    return getch_(0);
+}
+
+int get_command() {
+    int index = commandCounter - 1;
+    int cursorPosition = 0;
+    char input;
+    char tempCommand[256] = "";
+    int commandLength = 0;
+
+    initTermios(0);
+
+    while (1) {
+        input = getch();
+
+        if (input == 27) { // arrow keys
+            getch(); // skip [ [[A
+            switch(getch()) { // the real value
+                case 'A': // up
+                    if (index >= 0) {
+                        strcpy(tempCommand, commands[index--]);
+                        cursorPosition = strlen(tempCommand);
+                        printf("\33[2K\r"); // Clear the line
+                        printf("%s> %s", currentDirectory, tempCommand);
+                    }
+                    break;
+                case 'B': // down
+                    if (index < commandCounter - 1) {
+                        strcpy(tempCommand, commands[++index]);
+                        cursorPosition = strlen(tempCommand);
+                        printf("\33[2K\r"); // Clear the line
+                        printf("%s> %s", currentDirectory, tempCommand);
+                    }
+                    break;
+                
+                case 'C': // right arrow
+                    if (cursorPosition < commandLength) {
+                        cursorPosition++;
+                        printf("\033[C"); // Move cursor right
+                    }
+                    break;
+                case 'D': // left arrow
+                    if (cursorPosition > 0) {
+                        cursorPosition--;
+                        printf("\033[D"); // Move cursor left
+                    }
+                    break;
+            }
+        } else if (input == 10) { // enter key
+            printf("\n");
+            execute(tempCommand);
+            break;
+        } else if (input == 127) { // backspace
+            if (cursorPosition > 0) {
+                memmove(&tempCommand[cursorPosition - 1], &tempCommand[cursorPosition], strlen(tempCommand) - cursorPosition + 1);
+                cursorPosition--;
+                commandLength--;
+                printf("\033[2K\r%s> %s", currentDirectory, tempCommand);
+                printf("\033[%dG", cursorPosition + strlen(currentDirectory) + 3); // Move cursor to correct position
+            }
+        } else {
+            // Insert character at cursor position
+            memmove(&tempCommand[cursorPosition + 1], &tempCommand[cursorPosition], strlen(tempCommand) - cursorPosition);
+            tempCommand[cursorPosition] = input;
+            cursorPosition++;
+            commandLength++;
+
+            printf("\033[2K\r%s> %s", currentDirectory, tempCommand);
+            printf("\033[%dG", cursorPosition + strlen(currentDirectory) + 3);
         }
     }
-    
-    if (strlen(line) >= 1) {
-        add_to_history(line);
+
+    resetTermios();
+
+    if (commandLength > 0) {
+        tempCommand[commandLength] = '\0';
+        add_to_history(tempCommand);
+        strcpy(line, tempCommand);
         return 1;
     }
 
@@ -128,29 +223,20 @@ void exitt() {
     running = 0;
 }
 
-static struct termios old, current;
+// static struct termios old, current;
 
-void initTermios() 
-{
-  tcgetattr(0, &old); 
-  current = old; 
-  current.c_lflag &= ~(ICANON | ECHO); 
-  tcsetattr(0, TCSANOW, &current); 
-}
+// void initTermios() 
+// {
+//   tcgetattr(0, &old); 
+//   current = old; 
+//   current.c_lflag &= ~(ICANON | ECHO); 
+//   tcsetattr(0, TCSANOW, &current); 
+// }
 
-void resetTermios(void) 
-{
-  tcsetattr(0, TCSANOW, &old);
-}
-
-char getch(void) 
-{
-  char ch;
-  initTermios();
-  ch = getchar();
-  resetTermios();
-  return ch;
-}
+// void resetTermios(void) 
+// {
+//   tcsetattr(0, TCSANOW, &old);
+// }
 
 
 int history_with_arrows(void)
@@ -260,7 +346,20 @@ void ex_if(char** command, int size) {
                 condition_met = check_file(command[i + 2]);
                 i += 3; // Skip to next part after test condition
             }
-            // Extend with more conditions as needed
+            if (i + 2 < size && strcmp(command[i + 1], "-s") == 0) {
+                struct stat stat_record;
+                if (stat(command[i + 2], &stat_record)) {
+                    perror("Stat error");
+                    return;
+                }
+                if (stat_record.st_size <= 1) {
+                    condition_met = 1;
+                }
+                else {
+                    condition_met = 0;
+                }
+                i += 3;
+            }
         } else if (strcmp(part, "&&") == 0) {
             if (!condition_met) {
                 break; // Exit if previous condition failed
@@ -295,6 +394,7 @@ void ex_if(char** command, int size) {
         execute(new_command);
     }
 }
+// if test -f /home/andrei/Desktop/file.txt echo Ceva
 
 void execute(char* command) {
     int cnt = 0;
@@ -450,8 +550,7 @@ int main() {
     while (running) {
         getcwd(currentDirectory, 256);
         printf("%s> ", currentDirectory);
-        if(get_command())
-            execute(line);
+        get_command();
     }
     free(currentDirectory);
     return 0;
