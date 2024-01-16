@@ -325,11 +325,39 @@ int history_with_arrows(void)
     }
 }
 
-int check_file(const char *path) {
+int check_exist(const char *path) {
     if (access(path, F_OK) != -1) {
         return 1;
     } else {
         return 0;
+    }
+}
+
+int check_file(const char *path) {
+
+    if (access(path, F_OK) != -1) {
+
+        if (access(path, R_OK | X_OK | W_OK) != -1) {
+            return 0; 
+        } else {
+            return 1; 
+        }
+    } else {
+        return 0; 
+    }
+}
+
+int check_directory(const char *path) {
+
+    if (access(path, F_OK) != -1) {
+
+        if (access(path, R_OK | X_OK | W_OK) != -1) {
+            return 1; 
+        } else {
+            return 0; 
+        }
+    } else {
+        return 0; 
     }
 }
 
@@ -348,6 +376,14 @@ void ex_if(char** command, int size) {
                 condition_met = check_file(command[i + 2]);
                 i += 3; // Skip to next part after test condition
             }
+            if (i + 2 < size && strcmp(command[i + 1], "-d") == 0) {
+                condition_met = check_directory(command[i + 2]);
+                i += 3; // Skip to next part after test condition
+            }
+            if (i + 2 < size && strcmp(command[i + 1], "-e") == 0) {
+                condition_met = check_exist(command[i + 2]);
+                i += 3; // Skip to next part after test condition
+            }
             if (i + 2 < size && strcmp(command[i + 1], "-s") == 0) {
                 struct stat stat_record;
                 if (stat(command[i + 2], &stat_record)) {
@@ -361,6 +397,36 @@ void ex_if(char** command, int size) {
                     condition_met = 0;
                 }
                 i += 3;
+            }
+            if (i + 2 < size && strcmp(command[i + 1], "-r") == 0) {
+
+                if (access(command[i+2], R_OK) == 0) {
+                    condition_met = 1;
+                } else {
+                    condition_met = 0;
+                    perror("Error");
+                }
+                i+=3;
+            }
+            if (i + 2 < size && strcmp(command[i + 1], "-w") == 0) {
+
+                if (access(command[i+2], W_OK) == 0) {
+                    condition_met = 1;
+                } else {
+                    condition_met = 0;
+                    perror("Error");
+                }
+                i+=3;
+            }
+            if (i + 2 < size && strcmp(command[i + 1], "-x") == 0) {
+
+                if (access(command[i+2], X_OK) == 0) {
+                    condition_met = 1;
+                } else {
+                    condition_met = 0;
+                    perror("Error");
+                }
+                i+=3;
             }
         } else if (strcmp(part, "&&") == 0) {
             if (!condition_met) {
