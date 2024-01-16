@@ -7,18 +7,55 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 #define BUFFER_SIZE 1024
 
 char line[256];
-char commands[1001][256];
+char commands[1000][256];
 int commandCounter = 0;
 char* currentDirectory;
 int running = 1;
 struct termios old;
 
 void add_to_history(char* line) {
-    strcpy(commands[commandCounter++], line);
+    if (commandCounter <= 999) {
+        strcpy(commands[commandCounter++], line);
+    } else {
+        for (int i = 0; i < 999; i++) {
+            strcpy(commands[i], commands[i + 1]);
+        }
+        strcpy(commands[999], line);
+    }
+}
+
+void load_history() {
+    FILE* file = fopen("history.txt", "r");
+    if (file == NULL) {
+        return;
+    }
+
+    char buffer[256];
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+        buffer[strlen(buffer) - 1] = '\0';
+        add_to_history(buffer);
+    }
+
+    fclose(file);
+}
+
+void upload_history() {
+    FILE* file = fopen("history.txt", "w");
+    if (file == NULL) {
+        return;
+    }
+
+    for (int i = 0; i < commandCounter; i++) {
+        if (strcmp(commands[i], "exit") != 0)
+            fprintf(file, "%s\n", commands[i]);
+    }
+
+    fclose(file);
 }
 
 void initTermios(int echo) {
@@ -56,6 +93,7 @@ int get_command() {
     char input;
     char tempCommand[256] = "";
     int commandLength = 0;
+    char last_UP_DOWN_arrow;
 
     initTermios(0);
 
@@ -67,6 +105,9 @@ int get_command() {
             switch(getch()) { // the real value
                 case 'A': // up
                     if (index >= 0) {
+                        if (last_UP_DOWN_arrow == 'B')
+                            index--;
+                        last_UP_DOWN_arrow = 'A';
                         strcpy(tempCommand, commands[index--]);
                         cursorPosition = strlen(tempCommand);
                         commandLength = cursorPosition;
@@ -76,10 +117,20 @@ int get_command() {
                     break;
                 case 'B': // down
                     if (index < commandCounter - 1) {
+                        if (last_UP_DOWN_arrow == 'A')
+                            index++;
+                        last_UP_DOWN_arrow = 'B';
                         strcpy(tempCommand, commands[++index]);
                         cursorPosition = strlen(tempCommand);
                         commandLength = cursorPosition;
                         printf("\33[2K\r"); // Clear the line
+                        printf("%s> %s", currentDirectory, tempCommand);
+                    }
+                    else {
+                        strcpy(tempCommand, "");
+                        cursorPosition = 0;
+                        commandLength = 0;
+                        printf("\33[2K\r");
                         printf("%s> %s", currentDirectory, tempCommand);
                     }
                     break;
@@ -453,7 +504,23 @@ void ex_if(char** command, int size) {
         // Execute the command if condition is met
         char new_command[256] = "";
         int new_command_size = 0;
-        for (int j = i; j < size; ++j) {
+        for (int j = i; j < size && strcmp(command[j], "else") != 0; ++j) {
+            strcat(new_command, command[j]);
+            if(j != size - 1){
+                strcat(new_command, " ");
+            }
+        }
+        execute(new_command);
+    }
+    else {
+        while (strcmp(command[i], "else") != 0 && i < size) {
+            i++;
+        }
+        if (i == size) {
+            return;
+        }
+        char new_command[256] = "";
+        for (int j = i + 1; j < size; ++j) {
             strcat(new_command, command[j]);
             if(j != size - 1){
                 strcat(new_command, " ");
@@ -612,6 +679,8 @@ void execute(char* command) {
 
 
 int main() {
+
+    load_history();
     system("clear");
     currentDirectory = malloc(256 * sizeof(char));
 
@@ -621,5 +690,6 @@ int main() {
         get_command();
     }
     free(currentDirectory);
+    upload_history();
     return 0;
 }
